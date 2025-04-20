@@ -1,7 +1,7 @@
 {
     "name": "jobsearch",
     "build": {
-        "dockerfile": "Dockerfile"
+        "dockerfile": "../Dockerfile"
     },
     "customizations": {
         "vscode": {
