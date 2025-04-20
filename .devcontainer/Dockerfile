@@ -14,4 +14,14 @@ WORKDIR /workspace
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
-ENV PATH="/root/.cargo/bin:${PATH}" 
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+# Copy requirements file
+COPY requirements.txt .
+
+# Install dependencies
+RUN uv pip install -r requirements.txt
+
+# Install the package in development mode
+COPY . .
+RUN uv pip install -e . 
