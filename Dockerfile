@@ -15,6 +15,8 @@ WORKDIR /workspace
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
 ENV PATH="/root/.cargo/bin:${PATH}"
+# Add src directory to PYTHONPATH for easier imports
+ENV PYTHONPATH="${PYTHONPATH}:/workspace/src"
 
 # Copy requirements file
 COPY ./src/requirements.txt .
@@ -28,3 +30,6 @@ COPY . .
 # Install the package in development mode
 WORKDIR /workspace/src
 RUN uv pip install -e . --system
+
+# Return to workspace directory
+WORKDIR /workspace
