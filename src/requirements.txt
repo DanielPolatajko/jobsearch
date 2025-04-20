@@ -1,2 +1,4 @@
-# Python package dependencies
-# Add your requirements here 
+requests==2.32.3
+beautifulsoup4==4.13.4
+groq==0.22.0
+python-dotenv==1.1.0
