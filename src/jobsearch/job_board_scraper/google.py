@@ -2,9 +2,9 @@ from bs4 import BeautifulSoup
 import requests
 import time
 from typing import List, Dict, Any
-from jobsearch.job_board_scraper.base import JobDetails
+from jobsearch.job_board_scraper.base import JobScraper
 
-class GoogleJobSearcher(JobDetails):
+class GoogleJobSearcher(JobScraper):
     """Uses Google's job search results"""
     
     def search(self) -> List[Dict[str, Any]]:

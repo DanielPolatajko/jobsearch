@@ -2,12 +2,12 @@ from bs4 import BeautifulSoup
 import requests
 import time
 from typing import List, Dict, Any
-from jobsearch.job_board_scraper.base import JobDetails
+from jobsearch.job_board_scraper.base import JobScraper
 
-class LinkedInScraper(JobDetails):
+class LinkedInScraper(JobScraper):
     """Scrapes LinkedIn for job postings"""
     
-    def search(self) -> List[Dict[str, Any]]:
+    def search(self, limit: int = 10) -> List[Dict[str, Any]]:
         jobs = []
         
         for keyword in self.keywords:
@@ -59,4 +59,4 @@ class LinkedInScraper(JobDetails):
             except Exception as e:
                 self.logger.error(f"Error in LinkedIn search: {e}")
         
-        return jobs
+        return jobs[:limit]

@@ -2,7 +2,7 @@ from typing import List, Dict, Any
 from abc import ABC, abstractmethod
 import logging
 
-class JobDetails(ABC):
+class JobScraper(ABC):
     """Abstract base class for job details"""
     
     def __init__(self, keywords: List[str]):
