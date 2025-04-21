@@ -1,22 +1,42 @@
 from bs4 import BeautifulSoup
 import requests
 import time
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from jobsearch.job_board_scraper.base import JobScraper
 
 class LinkedInScraper(JobScraper):
     """Scrapes LinkedIn for job postings"""
     
+    def __init__(self, keywords: List[str], locations: Optional[List[str]] = None):
+        super().__init__(keywords)
+        self.locations = locations or []
+    
     def search(self, limit: int = 10) -> List[Dict[str, Any]]:
         jobs = []
         
-        for keyword in self.keywords:
-            self.logger.info(f"Searching LinkedIn for: {keyword}")
+        # If no locations provided, perform search with just keywords
+        search_combinations = []
+        if not self.locations:
+            search_combinations = [(keyword, None) for keyword in self.keywords]
+        else:
+            # Create combinations of keywords and locations
+            for keyword in self.keywords:
+                for location in self.locations:
+                    search_combinations.append((keyword, location))
+        
+        for keyword, location in search_combinations:
+            location_text = f" in {location}" if location else ""
+            self.logger.info(f"Searching LinkedIn for: {keyword}{location_text}")
             
             try:
                 # Build search URL (LinkedIn's public jobs page)
                 search_term = keyword.replace(" ", "%20")
                 url = f"https://www.linkedin.com/jobs/search/?keywords={search_term}"
+                
+                # Add location parameter if provided
+                if location:
+                    location_param = location.replace(" ", "%20")
+                    url += f"&location={location_param}"
                 
                 # Make request
                 headers = {
@@ -59,4 +79,12 @@ class LinkedInScraper(JobScraper):
             except Exception as e:
                 self.logger.error(f"Error in LinkedIn search: {e}")
         
-        return jobs[:limit]
+        # Remove duplicates by URL
+        unique_jobs = []
+        seen_urls = set()
+        for job in jobs:
+            if job["url"] not in seen_urls:
+                seen_urls.add(job["url"])
+                unique_jobs.append(job)
+        
+        return unique_jobs[:limit]
