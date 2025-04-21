@@ -17,7 +17,10 @@ class JobSearchAgent:
         
         # Initialize components
         self.job_sources = [
-            LinkedInScraper(keywords=self.config["search_keywords"])
+            LinkedInScraper(
+                keywords=self.config["search_keywords"],
+                locations=self.config.get("location_preferences", [])
+            )
         ]
         
         self.matcher = GroqJobMatcher(

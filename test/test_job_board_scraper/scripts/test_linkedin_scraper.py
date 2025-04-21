@@ -21,11 +21,15 @@ def main():
     # Define search keywords
     keywords = ["python developer", "data scientist"]
     
-    # Initialize the scraper
-    scraper = LinkedInScraper(keywords)
+    # Define location preferences
+    locations = ["San Francisco", "Remote", "New York"]
     
-    # Print the keywords being searched
+    # Initialize the scraper with both keywords and locations
+    scraper = LinkedInScraper(keywords, locations)
+    
+    # Print the search parameters
     print(f"Searching LinkedIn for: {', '.join(keywords)}")
+    print(f"In locations: {', '.join(locations)}")
     
     # Search for jobs
     try:
