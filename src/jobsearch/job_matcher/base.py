@@ -66,6 +66,9 @@ class BaseJobMatcher(ABC):
         2. Evaluate how well this job matches the candidate's interests (scale 1-10)
         3. Determine whether the candidate would likely receive a first-round interview based on qualifications
         4. Provide 2-3 key reasons why this job is a good match or not
+
+        ### Additional Instructions:
+        - You will be penalised for suggesting jobs that are not a good fit for the candidate, so be very strict in your assessment. Do not include jobs which are not a good fit in your output.
         
         ### Output Format:
         Return a JSON with the following structure:

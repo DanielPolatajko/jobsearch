@@ -4,6 +4,7 @@ import os
 import logging
 import groq
 from jobsearch.job_matcher.base import BaseJobMatcher
+from tqdm import tqdm
 
 class GroqJobMatcher(BaseJobMatcher):
     """
@@ -47,7 +48,7 @@ class GroqJobMatcher(BaseJobMatcher):
         try:
             ranked_jobs = []
             
-            for job in jobs:
+            for job in tqdm(jobs):
                 try:
                     # Prepare prompt for the model
                     base_prompt = self._prepare_analysis_prompt(job)

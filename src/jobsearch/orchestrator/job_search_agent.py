@@ -33,13 +33,19 @@ class JobSearchAgent:
     
     def run_job_search(self):
         """Execute a complete job search cycle"""
+
+        # Load job database from file
+        if os.path.exists("job_database.json"):
+            with open("job_database.json", "r") as f:
+                self.job_database = json.load(f)
+
         print(f"Starting job search at {datetime.datetime.now()}")
         
         # 1. Collect raw job listings from all sources
         raw_jobs = []
         for source in self.job_sources:
             try:
-                jobs = source.search()
+                jobs = source.search(10)
                 raw_jobs.extend(jobs)
                 print(f"Retrieved {len(jobs)} jobs from {source.__class__.__name__}")
             except Exception as e:
@@ -56,6 +62,10 @@ class JobSearchAgent:
             if job_id not in self.job_database:
                 self.job_database[job_id] = job
                 new_jobs.append(job)
+
+        # Write job database to file
+        with open("job_database.json", "w") as f:
+            json.dump(self.job_database, f)
         
         return new_jobs
 
