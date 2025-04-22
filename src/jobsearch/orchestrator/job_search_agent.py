@@ -4,9 +4,12 @@ import os
 import json
 import datetime
 import dotenv
-from jobsearch.job_board_scraper import LinkedInScraper
-from jobsearch.job_board_scraper.models import LinkedInJobSearchParameters
-from jobsearch.job_matcher import GroqJobMatcher
+from jobsearch.job_board_scraper.linkedin import linkedin_job_search_tool
+from langchain_anthropic import ChatAnthropic
+from langchain_core.prompts import PromptTemplate
+from jobsearch.orchestrator.prompts import BASE_PROMPT_TEMPLATE
+from langchain.agents import create_tool_calling_agent, AgentExecutor
+from langchain import hub
 
 
 class JobSearchAgent:
@@ -18,18 +21,32 @@ class JobSearchAgent:
         dotenv.load_dotenv()
 
         # Initialize components
-        self.job_sources = [
-            LinkedInScraper(
-                parameters=LinkedInJobSearchParameters.model_validate(
-                    self.config["linkedin_job_search_parameters"]
-                ),
-            )
-        ]
+        self.llm = ChatAnthropic(
+            model="claude-3-haiku-20240307",
+            api_key=os.environ.get("ANTHROPIC_API_KEY"),
+        )
 
-        self.matcher = GroqJobMatcher(
-            candidate_profile=self.config["candidate_profile"],
-            candidate_interests=self.config["candidate_interests"],
-            api_key=os.environ.get("GROQ_API_KEY"),
+        self.prompt = PromptTemplate(
+            name="Job search agent base template",
+            template=BASE_PROMPT_TEMPLATE,
+            input_variables=["profile_json", "interests_json"],
+        )
+
+        self.react_prompt = hub.pull("jacob/tool-calling-agent")
+
+        self.tools = [linkedin_job_search_tool]
+
+        self.agent = create_tool_calling_agent(
+            llm=self.llm,
+            tools=self.tools,
+            prompt=self.react_prompt,
+        )
+
+        self.executor = AgentExecutor(
+            agent=self.agent,
+            tools=self.tools,
+            verbose=True,
+            handle_parsing_errors=True,
         )
 
         self.job_database = {}  # Simple in-memory store, replace with proper DB
@@ -44,33 +61,27 @@ class JobSearchAgent:
 
         print(f"Starting job search at {datetime.datetime.now()}")
 
-        # 1. Collect raw job listings from all sources
-        raw_jobs = []
-        for source in self.job_sources:
-            try:
-                jobs = source.search()
-                raw_jobs.extend(jobs)
-                print(f"Retrieved {len(jobs)} jobs from {source.__class__.__name__}")
-            except Exception as e:
-                print(f"Error retrieving jobs from {source.__class__.__name__}: {e}")
+        # Run the agent
+        result = self.executor.invoke(
+            {
+                "input": self.prompt.format_prompt(
+                    **{
+                        "profile_json": self.config["candidate_profile"],
+                        "interests_json": self.config["candidate_interests"],
+                    }
+                ),
+                "{chat_history}": [],
+            }
+        )
 
-        # 2. Process and filter jobs
-        matching_jobs = self.matcher.process_jobs(raw_jobs)
-        print(f"Found {len(matching_jobs)} matching jobs after processing")
-
-        # 3. Store new jobs
-        new_jobs = []
-        for job in matching_jobs:
-            job_id = job["url"]  # Using URL as a unique identifier
-            if job_id not in self.job_database:
-                self.job_database[job_id] = job
-                new_jobs.append(job)
+        print(result)
+        result = dict(result)
 
         # Write job database to file
         with open("job_database.json", "w") as f:
-            json.dump(self.job_database, f)
+            json.dump(result, f)
 
-        return new_jobs
+        return result
 
 
 # Allow running as script or importing as module

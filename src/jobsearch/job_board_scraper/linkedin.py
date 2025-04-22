@@ -3,9 +3,17 @@ import requests
 import time
 from typing import List, Dict, Any, Optional
 from jobsearch.job_board_scraper.base import JobScraper
-from jobsearch.job_board_scraper.models import LinkedInJobSearchParameters
+from jobsearch.job_board_scraper.models import (
+    LinkedInJobSearchParameters,
+    LinkedInExperienceLevel,
+    LinkedInIndustry,
+    LinkedInJobType,
+)
 import urllib.parse
 import random
+from langchain_core.tools import StructuredTool
+from tqdm import tqdm
+import json
 
 
 class LinkedInScraper(JobScraper):
@@ -134,7 +142,9 @@ class LinkedInScraper(JobScraper):
 
             self.logger.info(f"Found {len(job_cards)} job cards")
 
-            for card in job_cards:
+            job_count = 0
+
+            for card in tqdm(job_cards):
                 try:
                     title_elem = card.select_one(".base-search-card__title")
                     company_elem = card.select_one(".base-search-card__subtitle")
@@ -163,6 +173,11 @@ class LinkedInScraper(JobScraper):
                         job["description"] = self._fetch_job_description(job_url)
 
                         jobs.append(self._standardize_job(job))
+                        job_count += 1
+
+                    if job_count >= limit:
+                        break
+
                 except Exception as e:
                     self.logger.error(f"Error parsing job card: {e}")
 
@@ -181,3 +196,97 @@ class LinkedInScraper(JobScraper):
                 unique_jobs.append(job)
 
         return unique_jobs[:limit]
+
+
+def linkedin_job_search_tool_callable(
+    location: str,
+    job_title: str,
+    experience_level: int,
+    industries: list[int],
+    job_type: str,
+) -> list[dict]:
+    """
+    Process LinkedIn job search with proper conversion of parameters.
+    This handles both direct calls and calls via the LangChain tool.
+    """
+    # Convert raw values to enum instances
+    try:
+        # Convert experience_level to enum
+        exp_level = experience_level
+        if isinstance(experience_level, int):
+            exp_level = LinkedInExperienceLevel(experience_level)
+
+        # Convert industries to enum list
+        ind_list = []
+        for industry in industries:
+            if isinstance(industry, int):
+                ind_list.append(LinkedInIndustry(industry))
+            else:
+                ind_list.append(industry)
+
+        # Convert job_type to enum
+        j_type = job_type
+        if isinstance(job_type, str):
+            j_type = LinkedInJobType(job_type)
+
+        # Create parameters object
+        parameters = LinkedInJobSearchParameters(
+            job_title=job_title,
+            location=location,
+            experience_level=exp_level,
+            industries=ind_list,
+            job_type=j_type,
+        )
+
+        # Create scraper and search
+        scraper = LinkedInScraper(parameters)
+        results = scraper.search()
+        # Convert to simpler dict format for JSON serialization
+        simplified_results = []
+        for job in results:
+            simplified_results.append(
+                {
+                    "title": job["title"],
+                    "company": job["company"],
+                    "location": job["location"],
+                    "url": job["url"],
+                    "description": job["description"][:500] + "..."
+                    if len(job["description"]) > 500
+                    else job["description"],
+                }
+            )
+        return simplified_results
+
+    except Exception as e:
+        import traceback
+
+        print(f"Error in LinkedIn job search tool: {e}")
+        print(traceback.format_exc())
+        return [{"error": f"Failed to search LinkedIn: {str(e)}"}]
+
+
+linkedin_job_search_tool = StructuredTool(
+    name="linkedin_job_search",
+    description="""
+    Tool to search for jobs on LinkedIn based on your specified criteria. You must provide all of the following parameters:
+    
+    - location: The location to search for jobs (e.g., "London, United Kingdom", "New York", "Remote")
+    - job_title: The job title to search for (e.g., "Software Engineer", "Product Manager")
+    - experience_level: The experience level required (use 3 for ASSOCIATE or 4 for MID_SENIOR)
+    - industries: List of industry IDs to search in. Available industries are:
+      * 3252: CLIMATE_DATA_AND_ANALYTICS
+      * 86: ENVIRONMENTAL_SERVICES
+    - job_type: The type of job. Use "F" for FULL_TIME
+    
+    Example input: 
+    {
+        "location": "London, United Kingdom",
+        "job_title": "Product Manager",
+        "experience_level": 4,
+        "industries": [3252, 86],
+        "job_type": "F"
+    }
+    """,
+    func=linkedin_job_search_tool_callable,
+    args_schema=LinkedInJobSearchParameters,
+)
