@@ -2,7 +2,7 @@ from .linkedin import LinkedInScraper
 from .climatebase import ClimatebaseScraper
 from .google import GoogleJobSearcher
 from .tavily_scraper import TavilyScraper
-from .crawler import CompanyCareerCrawler
+from ..job_crawler.crawler import CompanyCareerCrawler
 
 __all__ = [
     "LinkedInScraper",

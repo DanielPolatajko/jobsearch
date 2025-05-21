@@ -102,3 +102,39 @@ class CompanyRepository:
                 company.industry = industry
                 session.commit()
             return company
+
+    def get_companies_with_no_urls(self, limit: int = 5) -> list[Company]:
+        with session_factory() as session:
+            return (
+                session.query(Company)
+                .filter(Company.homepage_url.is_(None))
+                .filter(Company.careers_url.is_(None))
+                .limit(limit)
+                .all()
+            )
+
+    def get_companies_with_homepage_url_but_no_careers_url(
+        self, limit: int = 5
+    ) -> list[Company]:
+        with session_factory() as session:
+            return (
+                session.query(Company)
+                .filter(Company.homepage_url.isnot(None))
+                .filter(Company.careers_url.is_(None))
+                .limit(limit)
+                .all()
+            )
+
+    def update_company_homepage_url(self, id: int, homepage_url: str) -> Company:
+        with session_factory() as session:
+            company = session.query(Company).filter_by(id=id).first()
+            company.homepage_url = homepage_url
+            session.commit()
+            return company
+
+    def update_company_careers_url(self, id: int, careers_url: str) -> Company:
+        with session_factory() as session:
+            company = session.query(Company).filter_by(id=id).first()
+            company.careers_url = careers_url
+            session.commit()
+            return company
