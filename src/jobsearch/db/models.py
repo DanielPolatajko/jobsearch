@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime
+from sqlalchemy import Column, Integer, String, DateTime, Boolean
 from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
@@ -23,6 +23,8 @@ class CompanyListPage(Base):
     id = Column(Integer, primary_key=True)
     url = Column(String, nullable=False, unique=True)
     name = Column(String, nullable=False, unique=True)
+    query = Column(String, nullable=False, foreign_key="searchcache.query")
+    location_relevant = Column(Boolean, nullable=False, default=False)
     last_scraped = Column(DateTime)
 
     def __repr__(self):
