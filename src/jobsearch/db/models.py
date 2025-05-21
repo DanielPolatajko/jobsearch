@@ -27,3 +27,16 @@ class CompanyListPage(Base):
 
     def __repr__(self):
         return f"<CompanyListPage(url='{self.url}', name='{self.name}')>"
+
+
+class SearchCache(Base):
+    __tablename__ = "searchcache"
+
+    id = Column(Integer, primary_key=True)
+    query = Column(String, nullable=False)
+    last_searched = Column(DateTime)
+
+    def __repr__(self):
+        return (
+            f"<SearchCache(query='{self.query}', last_searched='{self.last_searched}')>"
+        )
