@@ -21,21 +21,14 @@ from jobsearch.db.repository import (
     CompanyRepository,
 )
 
-from jobsearch.job_crawler.task_agents import CareersPageFinderAgent
+from jobsearch.job_crawler.task_agents import (
+    CareersPageFinderAgent,
+    JobInfoExtractorAgent,
+)
 
 # Fix the logger to use a proper name and configure handlers
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
-
-# # Add a handler to output to terminal if no handlers exist
-# if not logger.handlers:
-#     console_handler = logging.StreamHandler()
-#     console_handler.setLevel(logging.INFO)
-#     formatter = logging.Formatter(
-#         "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-#     )
-#     console_handler.setFormatter(formatter)
-#     logger.addHandler(console_handler)
 
 
 class CompanyCareerCrawler:
@@ -98,6 +91,7 @@ class CompanyCareerCrawler:
         self.search_cache_repository = SearchCacheRepository()
 
         self.careers_page_finder_agent = CareersPageFinderAgent()
+        self.job_info_extractor_agent = JobInfoExtractorAgent()
 
     def find_company_lists(self) -> list[dict[str, Any]]:
         """
@@ -432,7 +426,7 @@ class CompanyCareerCrawler:
 
         except Exception as e:
             self.logger.error(f"Error finding career pages: {e}")
-            return {}
+            raise e
 
     def extract_job_listings(self) -> dict[str, list[dict[str, Any]]]:
         """
@@ -441,54 +435,15 @@ class CompanyCareerCrawler:
         Returns:
             Dictionary mapping company names to their job listings
         """
-        if not self.career_pages:
-            self.logger.warning("No career pages found. Run find_career_pages() first.")
-            return {}
-
-        self.logger.info(
-            f"Extracting job listings from {len(self.career_pages)} career pages"
-        )
-
         try:
-            for company_name, career_url in self.career_pages.items()[:10]:
-                # Create a crawler to extract job listings from the career page
-                documents = asyncio.run(self.crawl_webpage(career_url))
-
-                # Extract job listings from all crawled pages
-                job_listings = []
-
-                for doc in documents:
-                    content = doc.markdown
-                    url = doc.url
-                    links = doc.links["external"]
-
-                    # Extract job titles and links from content and links
-                    extracted_jobs = self._extract_job_listings(content, links, url)
-
-                    # Filter by target roles if specified
-                    if self.target_roles:
-                        filtered_jobs = [
-                            job
-                            for job in extracted_jobs
-                            if self._matches_target_role(job.get("title", ""))
-                        ]
-                        job_listings.extend(filtered_jobs)
-                    else:
-                        job_listings.extend(extracted_jobs)
-
-                if job_listings:
-                    self.job_listings[company_name] = job_listings
-                    self.logger.info(
-                        f"Found {len(job_listings)} relevant job listings for {company_name}"
-                    )
-                else:
-                    self.logger.warning(
-                        f"No relevant job listings found for {company_name}"
-                    )
-
-            total_jobs = sum(len(jobs) for jobs in self.job_listings.values())
-            roles_str = f" matching target roles" if self.target_roles else ""
-            self.logger.info(f"Found {total_jobs} total job listings{roles_str}")
+            careers_urls = self.company_repository.get_companies_with_careers_url(
+                limit=self.max_lists
+            )
+            for company in careers_urls:
+                job_listings = self.job_info_extractor_agent.extract_job_info(
+                    company.careers_url, self.target_roles
+                )
+                # TODO: Save job listings to database
 
             return self.job_listings
 
@@ -927,97 +882,6 @@ class CompanyCareerCrawler:
         name = " ".join(word.capitalize() for word in name.split())
 
         return name
-
-    def _find_career_page_url(
-        self,
-        homepage_url: str,
-        links: list[str],
-        location: str | None = None,
-        target_roles: set[str] | None = None,
-    ) -> str | None:
-        """
-        Find the careers page URL from the homepage links.
-        If location is specified, try to find location-specific career pages.
-        If target roles are specified, prioritize role-specific career pages.
-
-        Args:
-            homepage_url: The homepage URL
-            links: List of links found on the homepage
-            location: Optional location to prioritize location-specific career pages
-            target_roles: Optional set of target roles to prioritize role-specific career pages
-
-        Returns:
-            URL of the career page
-        """
-        if not links:
-            return None
-
-        # Keywords that indicate a careers page
-        career_keywords = ["career", "careers", "jobs", "job", "work", "join", "hiring"]
-
-        # Base domain for relative links
-        base_domain = "/".join(homepage_url.split("/")[:3])  # http(s)://domain.com
-
-        # Look for links containing career keywords
-        career_links = []
-
-        for link in links:
-            # Handle relative links
-            if link.startswith("/"):
-                link = base_domain + link
-
-            # Check if the link is a career page
-            link_lower = link.lower()
-            link_path = link_lower.split("/")
-
-            for keyword in career_keywords:
-                if keyword in link_path:
-                    career_links.append(link)
-                    break
-
-        # If no career links found, return None
-        if not career_links:
-            return None
-
-        # Define scoring function for prioritizing links based on location and roles
-        def score_link(link):
-            score = 0
-            link_lower = link.lower()
-
-            # Higher score for links that contain "careers" or "jobs" as a whole word
-            if re.search(r"\b(careers|jobs)\b", link_lower):
-                score += 5
-
-            # Location-specific prioritization
-            if location:
-                location_words = location.lower().split()
-                if any(
-                    loc_word in link_lower
-                    for loc_word in location_words
-                    if len(loc_word) > 2
-                ):
-                    score += 10
-
-            # Role-specific prioritization
-            if target_roles:
-                for role in target_roles:
-                    role_words = role.lower().split()
-                    if any(
-                        role_word in link_lower
-                        for role_word in role_words
-                        if len(role_word) > 2
-                    ):
-                        score += 15
-                        break
-
-            return score
-
-        # Sort career links by score (highest first)
-        scored_links = [(score_link(link), link) for link in career_links]
-        scored_links.sort(reverse=True)
-
-        # Return the highest-scoring link
-        return scored_links[0][1] if scored_links else None
 
 
 if __name__ == "__main__":

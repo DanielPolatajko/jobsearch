@@ -138,3 +138,12 @@ class CompanyRepository:
             company.careers_url = careers_url
             session.commit()
             return company
+
+    def get_companies_with_careers_url(self, limit: int = 5) -> list[Company]:
+        with session_factory() as session:
+            return (
+                session.query(Company)
+                .filter(Company.careers_url.isnot(None))
+                .limit(limit)
+                .all()
+            )
